@@ -235,17 +235,20 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
-    if dataset.chunks is None:
+    ds_chunks = tuple([c for c in dataset.chunks if c != 1]) if dataset.chunks else None
+    ds_shape = tuple([s for s in dataset.shape if s != 1]) if dataset.shape else None
+
+    if ds_chunks is None:
         if dsid.get_offset() is None:
-            chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
-        elif dataset.shape == ():
+            chunk_manifest = ChunkManifest(entries={}, shape=ds_shape)
+        elif ds_shape == ():
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=np.array(filepath, dtype=np.dtypes.StringDType),  # type: ignore
                 offsets=np.array(dsid.get_offset(), dtype=np.uint64),
                 lengths=np.array(dsid.get_storage_size(), dtype=np.uint64),
             )
         else:
-            key_list = [0] * (len(dataset.shape) or 1)
+            key_list = [0] * (len(ds_shape) or 1)
             key = ".".join(map(str, key_list))
 
             chunk_entry: ChunkEntry = ChunkEntry.with_validation(  # type: ignore[attr-defined]
@@ -257,17 +260,17 @@ def _dataset_chunk_manifest(
     else:
         num_chunks = dsid.get_num_chunks()
         if num_chunks == 0:
-            chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
+            chunk_manifest = ChunkManifest(entries={}, shape=ds_shape)
         else:
             shape = tuple(
-                math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
+                math.ceil(a / b) for a, b in zip(ds_shape, ds_chunks)
             )
             paths = np.empty(shape, dtype=np.dtypes.StringDType)
             offsets = np.empty(shape, dtype=np.uint64)
             lengths = np.empty(shape, dtype=np.uint64)
 
             def get_key(blob):
-                return tuple(a // b for a, b in zip(blob.chunk_offset, dataset.chunks))
+                return tuple(a // b for a, b in zip(blob.chunk_offset, ds_chunks))
 
             def add_chunk_info(blob):
                 key = get_key(blob)
