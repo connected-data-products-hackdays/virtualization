@@ -1,3 +1,4 @@
+#%%
 """
 Iterate OPR data site and generate manifest files for each dataproduct.
 """
@@ -6,7 +7,6 @@ import virtualizarr
 import requests
 import h5py
 import xarray as xr
-
 
 from obspec_utils.registry import ObjectStoreRegistry
 from obspec_utils.stores import AiohttpStore
@@ -83,19 +83,23 @@ def iterate_opr_dataproducts():
 def create_manifest(file_path: str, parser):
     """Create a manifest file from a dataproduct link."""
 
-    vds = virtualizarr.open_virtual_dataset(
-        url=file_path,
-        parser=parser,
-        registry=file_registry,
-        # loadable_variables=['time'],
-        decode_times=True,
-    )
+    store= parser(url=file_path, registry=file_registry)
+    ds = xr.open_zarr(store, consolidated=False, zarr_format=3)
+    ds.Surface.load()
+    # vds = virtualizarr.open_virtual_dataset(
+    #     url=file_path,
+    #     parser=parser,
+    #     registry=file_registry,
+    #     # loadable_variables=['time'],
+    #     decode_times=True,
+    # )
 
-    vds.virtualize.to_kerchunk('opr.json', format="json")
-    ds = xr.open_dataset("opr.json", engine="kerchunk")
+    # vds.virtualize.to_kerchunk('opr.json', format="json")
+    # ds = xr.open_dataset("opr.json", engine="kerchunk")
 
-    print(ds)
-    input("SUCCESSFUL DATASET OPEN")
+    # print(ds)
+    # ds.Surface.plot()
+    return ds
 
 
 def is_drop(v: str):
@@ -122,7 +126,8 @@ if __name__ == "__main__":
             parser = virtualizarr.parsers.HDFParser(drop_variables=drop_vars)
 
             try:
-                create_manifest(file_path, parser)
+                ds = create_manifest(file_path, parser)
+                print(ds)
                 break
             except ValueError as e:
                 new_vars = [a.strip("}{'") for a in str(e).split(" ")[-1].strip("/").split("/")]
@@ -131,3 +136,5 @@ if __name__ == "__main__":
                     break
                 print(f"{e}: Adding vars to drop vars: {new_vars}")
                 drop_vars.extend(new_vars)
+
+# %%
